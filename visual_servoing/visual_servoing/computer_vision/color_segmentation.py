@@ -65,7 +65,7 @@ def cd_color_segmentation(img, template=None):
     # image_print(img_dilate)  
 
     # detect contours
-    img_gray = cv2.cvtColor(img_dilate, cv2.IMREAD_GRAYSCALE)
+    img_gray = cv2.cvtColor(img_dilate, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(img_gray, 199, 200)
     # image_print(edges)
 
