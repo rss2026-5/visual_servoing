@@ -77,12 +77,14 @@ class YoloAnnotatorNode(Node):
         "chair", "couch", "tv", "laptop", "dining table", and many more. The list
         of available classes can be found in `self.model.names`.
         """
-        # TODO: Customize this dictionary for the lab. Choose a subset of
-        #       COCO class names to detect and their corresponding colors
-        #       in the annotated image.
         return {
+            "person": (0, 255, 0),
+            "backpack": (255, 128, 0),
+            "bottle": (0, 255, 255),
+            "cup": (255, 0, 255),
             "chair": (255, 0, 0),
-            "dining table": (0, 255, 0),
+            "laptop": (0, 128, 255),
+            "cell phone": (128, 255, 0),
         }
 
     def on_image(self, msg: Image) -> None:
@@ -143,11 +145,17 @@ class YoloAnnotatorNode(Node):
         conf_np = conf.detach().cpu().numpy() if hasattr(conf, "detach") else np.asarray(conf)
         cls_np = cls.detach().cpu().numpy() if hasattr(cls, "detach") else np.asarray(cls)
 
-        # TODO: Store YOLO outputs as Detections. Iterate through xyxy_np, conf_np, and cls_np
-        #       to append a Detection with all its instance variables filled in to the
-        #       detections List.
-        #
-        # Hint: use Python's zip keyword to iterate through the three arrays in a single for loop.
+        for box, c, cl in zip(xyxy_np, conf_np, cls_np):
+            class_id = int(cl)
+            detections.append(Detection(
+                class_id=class_id,
+                class_name=self.model.names[class_id],
+                confidence=float(c),
+                x1=int(box[0]),
+                y1=int(box[1]),
+                x2=int(box[2]),
+                y2=int(box[3]),
+            ))
 
         return detections
 
@@ -160,18 +168,11 @@ class YoloAnnotatorNode(Node):
         out_image = bgr_image.copy()
 
         for det in detections:
-            # TODO: Get the bounding box for the detection
-
-            # TODO: Draw the bounding box around the detection to the output image.
-            #       Use the colors you specified per class in `get_class_color_map`
-            #       by accessing the self.class_color_map dictionary.
-            #
-            # Hint: Use cv2's `rectangle` function to draw a rectangle on the annotated image.
-
-            # TODO: Label the box with the class name and confidence.
-            #
-            # Hint: Use cv2's `putText` function to put text on the annotated image.
-            raise NotImplementedError
+            color = self.class_color_map.get(det.class_name, (255, 255, 255))
+            cv2.rectangle(out_image, (det.x1, det.y1), (det.x2, det.y2), color, 2)
+            label = f"{det.class_name} {det.confidence:.2f}"
+            cv2.putText(out_image, label, (det.x1, det.y1 - 8),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
         return out_image
 

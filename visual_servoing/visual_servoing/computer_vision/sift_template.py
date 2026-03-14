@@ -39,7 +39,7 @@ def cd_sift_ransac(img, template):
             and (x2, y2) is the bottom-right pixel of the box.
     """
     # Minimum number of matching features
-    MIN_MATCH = 10  # Adjust this value as needed
+    MIN_MATCH = 7  # Adjust this value as needed
     # Create SIFT
     sift = cv2.SIFT_create()
 
@@ -64,6 +64,10 @@ def cd_sift_ransac(img, template):
 
         # Create mask
         M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+
+        if M is None:
+            return ((0, 0), (0, 0))
+
         matchesMask = mask.ravel().tolist()
 
         h, w = template.shape
@@ -71,7 +75,10 @@ def cd_sift_ransac(img, template):
 
         ########## YOUR CODE STARTS HERE ##########
 
-        x_min = y_min = x_max = y_max = 0
+        dst = cv2.perspectiveTransform(pts, M)
+        dst = dst.reshape(-1, 2)
+        x_min, y_min = np.int32(dst.min(axis=0))
+        x_max, y_max = np.int32(dst.max(axis=0))
 
         ########### YOUR CODE ENDS HERE ###########
 
@@ -116,12 +123,18 @@ def cd_template_matching(img, template):
             continue
 
         ########## YOUR CODE STARTS HERE ##########
-        # Use OpenCV template matching functions to find the best match
-        # across template scales.
 
-        # Remember to resize the bounding box using the highest scoring scale
-        # x1,y1 pixel will be accurate, but x2,y2 needs to be correctly scaled
-        bounding_box = ((0, 0), (0, 0))
+        result = cv2.matchTemplate(img_canny, resized_template, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, max_loc = cv2.minMaxLoc(result)
+
+        if best_match is None or max_val > best_match[0]:
+            best_match = (max_val, max_loc, h, w)
+
         ########### YOUR CODE ENDS HERE ###########
 
-    return bounding_box
+    if best_match is None:
+        return ((0, 0), (0, 0))
+
+    _, max_loc, h, w = best_match
+    x1, y1 = max_loc
+    return ((x1, y1), (x1 + w, y1 + h))
