@@ -31,11 +31,11 @@ PTS_IMAGE_PLANE = [[403, 286],
 # car looks along positive x axis with positive y axis to left
 
 ######################################################
-PTS_GROUND_PLANE = [[0,   10],
-                    [-10, 10],
-                    [0,   15],
+PTS_GROUND_PLANE = [[10,  0],
                     [10,  10],
-                    [0,   35]]
+                    [15,  0],
+                    [10,  -10],
+                    [35,  0]]
 ######################################################
 
 METERS_PER_INCH = 0.0254
