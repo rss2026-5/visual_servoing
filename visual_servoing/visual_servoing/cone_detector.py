@@ -56,6 +56,10 @@ class ConeDetector(Node):
             cone_msg.v = float(v)
             self.cone_pub.publish(cone_msg)
 
+            # Draw bounding box and center point on debug image
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.circle(image, (int(u), int(v)), 5, (0, 0, 255), -1)
+
         debug_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
         self.debug_pub.publish(debug_msg)
 

@@ -19,13 +19,9 @@ LOCAL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo "==> Deploying to ${ROBOT}"
 echo ""
 
-# visual_servoing ROS2 package
+# visual_servoing ROS2 package (includes vs_msgs)
 echo "  visual_servoing/"
 scp -r "${LOCAL_ROOT}/visual_servoing/" "${ROBOT}:${REMOTE_WS}/visual_servoing/"
-
-# vs_msgs custom message definitions
-echo "  vs_msgs/"
-scp -r "${LOCAL_ROOT}/vs_msgs/" "${ROBOT}:${REMOTE_WS}/vs_msgs/"
 
 echo ""
 echo "==> Files deployed. Now on the robot (inside Docker):"
