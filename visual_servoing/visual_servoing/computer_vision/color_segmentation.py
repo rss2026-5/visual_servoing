@@ -24,7 +24,7 @@ def image_print(img):
     cv2.destroyAllWindows()
 
 
-def cd_color_segmentation(img, template):
+def cd_color_segmentation(img, template=None):
     """
     Implement the cone detection using color segmentation algorithm
     Input:
@@ -36,9 +36,73 @@ def cd_color_segmentation(img, template):
     """
     ########## YOUR CODE STARTS HERE ##########
 
-    bounding_box = ((0, 0), (0, 0))
+    # convert from BGR to HSV
+    # img_bgr = cv2.imread(img)
+    img_bgr = img
+    # image_print(img_bgr)
+    img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    # image_print(img_hsv)
+
+    # define color thresholds & generate mask    
+    lower1 = np.array([0, 150, 80])
+    upper1 = np.array([23, 255, 255])
+    lower2 = np.array([165, 50, 50])
+    upper2 = np.array([185, 255, 255])
+    hsv_mask = cv2.inRange(img_hsv, lower1, upper1) + cv2.inRange(img_hsv, lower2, upper2)
+    # hsv_mask = cv2.inRange(img_hsv, lower2, upper2)
+
+    img_masked = cv2.bitwise_and(img_bgr, img_bgr, mask=hsv_mask)
+
+    # image_print(img_masked)
+
+    # image cleanup / noise reduction
+    kernel = np.ones((7, 7), np.uint8)
+    img_erode = cv2.erode(img_masked, kernel, iterations=1)
+    # image_print(img_erode) 
+
+    kernel = np.ones((7, 7), np.uint8)
+    img_dilate = cv2.dilate(img_erode, kernel, iterations=1)
+    # image_print(img_dilate)  
+
+    # detect contours
+    img_gray = cv2.cvtColor(img_dilate, cv2.IMREAD_GRAYSCALE)
+    edges = cv2.Canny(img_gray, 199, 200)
+    # image_print(edges)
+
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    area_list = []
+    x_list = []
+    y_list = []
+    w_list = []
+    h_list = []
+
+    # draw bounding box
+    for i in range(len(contours)):        
+        x, y, w, h = cv2.boundingRect(contours[i])
+        x_list.append(x)
+        y_list.append(y)
+        w_list.append(w)
+        h_list.append(h)
+        area = w*h
+        area_list.append(area)
+
+    # print(area_list)
+    if area_list != []:
+        chosen = h_list.index(max(h_list))  
+        bounding_box = ((x_list[chosen], y_list[chosen]), (x_list[chosen] + w_list[chosen], y_list[chosen] + h_list[chosen]))
+    else: bounding_box = ((0,0), (0,0))
+    
+
+    # cv2.rectangle(img_bgr, (x_list[chosen], y_list[chosen]), (x_list[chosen] + w_list[chosen], y_list[chosen] + h_list[chosen]), (0, 255, 0), 2)
+    # image_print(img_bgr)
+    # print(bounding_box)
+
+    # else: bounding_box = ((0,0), (0,0))
 
     ########### YOUR CODE ENDS HERE ###########
 
     # Return bounding box
     return bounding_box
+
+# cd_color_segmentation('test_images_cone/test11.jpg')
