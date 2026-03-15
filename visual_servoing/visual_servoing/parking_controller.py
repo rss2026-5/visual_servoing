@@ -35,7 +35,7 @@ class ParkingController(Node):
         self.relative_x = 0
         self.relative_y = 0
 
-        self.speed = 1.0 # hardcoded max speed, as given
+        self.speed = 1.75 # hardcoded max speed
         self.acceptable_distance_error = self.speed * 0.08 # can change this
         self.acceptable_angle_error = 0.05 # can change this
         self.max_angle = 0.3 # can change this
