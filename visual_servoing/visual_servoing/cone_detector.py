@@ -30,8 +30,8 @@ PTS_GROUND_PLANE = [[10,  0],
 METERS_PER_INCH = 0.0254
 
 # Line follower parameters
-LOOKAHEAD_DISTANCE  = 0.9   # meters ahead to place the "virtual cone"; must be > parking_distance
-LOOKAHEAD_BAND_PX   = 20    # height of the pixel band scanned around the lookahead row
+LOOKAHEAD_DISTANCE = 1.0   # meters ahead to place the "virtual cone"; must be > parking_distance
+LOOKAHEAD_BAND_PX  = 200   # tall pixel band to scan for orange (covers multiple dashes)
 
 # HSV thresholds for orange (same as color_segmentation.py)
 LOWER_ORANGE_1 = np.array([0,   150,  80])
@@ -62,9 +62,9 @@ class ConeDetector(Node):
         # pixel row corresponds to LOOKAHEAD_DISTANCE straight ahead.
         np_pts_ground = np.array(PTS_GROUND_PLANE, dtype=np.float32) * METERS_PER_INCH
         np_pts_image  = np.array(PTS_IMAGE_PLANE,  dtype=np.float32)
-        h, _ = cv2.findHomography(np_pts_image[:, np.newaxis, :],
-                                   np_pts_ground[:, np.newaxis, :])
-        h_inv = np.linalg.inv(h)
+        self.h, _ = cv2.findHomography(np_pts_image[:, np.newaxis, :],
+                                       np_pts_ground[:, np.newaxis, :])
+        h_inv = np.linalg.inv(self.h)
 
         # Project (LOOKAHEAD_DISTANCE, 0) in ground plane back to image
         ground_pt = np.array([[LOOKAHEAD_DISTANCE], [0.0], [1.0]])
@@ -108,28 +108,50 @@ class ConeDetector(Node):
 
     def _line_follower_pixel(self, image):
         """
-        Line follower mode: find the orange line's column centroid at a fixed
-        pixel row that corresponds to LOOKAHEAD_DISTANCE ahead of the car.
-        The parking controller will steer toward this point, chasing it like a
-        carrot since parking_distance < LOOKAHEAD_DISTANCE.
+        Line follower mode: scan a large band around the lookahead row, project
+        every orange pixel to ground distance via the homography, then keep only
+        pixels with ground_x >= LOOKAHEAD_DISTANCE and pick the closest one.
+
+        Robust to dashed lines: the large band captures whichever dash is
+        visible, and the ground-distance filter picks the nearest dash that is
+        at least LOOKAHEAD_DISTANCE ahead.
         """
         img_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         mask = (cv2.inRange(img_hsv, LOWER_ORANGE_1, UPPER_ORANGE_1) |
                 cv2.inRange(img_hsv, LOWER_ORANGE_2, UPPER_ORANGE_2))
 
-        # Crop to a horizontal band around the lookahead row
         img_h = image.shape[0]
         r0 = max(0, self.lookahead_row - LOOKAHEAD_BAND_PX // 2)
         r1 = min(img_h, self.lookahead_row + LOOKAHEAD_BAND_PX // 2)
-        band = mask[r0:r1, :]
 
-        orange_cols = np.where(band > 0)[1]
-        if len(orange_cols) == 0:
-            return None  # line not visible at lookahead distance; don't publish
+        rows, cols = np.where(mask[r0:r1, :] > 0)
+        if len(rows) == 0:
+            return None
+
+        rows = rows + r0  # shift back to full-image coordinates
+
+        # Project all orange pixels to ground plane (vectorised)
+        ones = np.ones(len(rows))
+        pts = np.stack([cols, rows, ones], axis=0).astype(np.float64)  # 3×N
+        gnd = self.h @ pts
+        gnd /= gnd[2:3, :]
+        ground_x = gnd[0, :]  # forward distance per pixel
+
+        # Keep only pixels at or beyond the lookahead distance
+        valid = ground_x >= LOOKAHEAD_DISTANCE
+        if not np.any(valid):
+            return None
+
+        # Pick the row with minimum ground_x among valid pixels (nearest dash ahead)
+        best_row = rows[valid][np.argmin(ground_x[valid])]
+
+        # Column centroid of that row for a stable lateral estimate
+        same_row = (rows == best_row)
+        u = float(np.mean(cols[same_row]))
 
         msg = ConeLocationPixel()
-        msg.u = float(np.mean(orange_cols))   # lateral centroid of the line
-        msg.v = float(self.lookahead_row)      # fixed row = fixed forward distance
+        msg.u = u
+        msg.v = float(self.lookahead_row)  # fixed v keeps forward distance constant
         return msg
 
 
