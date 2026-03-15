@@ -19,8 +19,10 @@ class ParkingController(Node):
     def __init__(self):
         super().__init__("parking_controller")
 
-        self.declare_parameter("drive_topic", "/drive") # changed 
-        DRIVE_TOPIC = self.get_parameter("drive_topic").value  # set in launch file; different for simulator vs racecar
+        self.declare_parameter("drive_topic", "/drive")
+        self.declare_parameter("line_follower", False)
+        DRIVE_TOPIC = self.get_parameter("drive_topic").value
+        self.line_follower = self.get_parameter("line_follower").value
 
         self.drive_pub = self.create_publisher(AckermannDriveStamped, DRIVE_TOPIC, 10)
         self.error_pub = self.create_publisher(ParkingError, "/parking_error", 10)
@@ -31,14 +33,14 @@ class ParkingController(Node):
             Joy, "/vesc/joy", self.joy_callback, 1)
 
         self.rb_held = False
-        self.parking_distance = 0.75  # meters; try playing with this number!
+        self.parking_distance = 0.3  # meters; try playing with this number!
         self.relative_x = 0
         self.relative_y = 0
 
-        self.speed = 1.75 # hardcoded max speed
+        self.speed = 1.5 # hardcoded max speed
         self.acceptable_distance_error = self.speed * 0.08 # can change this
         self.acceptable_angle_error = 0.05 # can change this
-        self.max_angle = 0.3 # can change this
+        self.max_angle = 0.4 # can change this
         self.previous_steering_angle = None
 
         self.get_logger().info("Parking Controller Initialized")
@@ -82,13 +84,17 @@ class ParkingController(Node):
             # defaults to driving foward, causing the car to circle until the target is within the front cone
             velocity *= 1
         else:
-            if relative_distance < self.speed * 0.5 / np.sin(self.max_angle): 
+            if relative_distance < self.speed * 0.5 / np.sin(self.max_angle):
                 # back up if target is in "unreachable zones"
                 velocity *= -1
                 steering_angle = 0.0
             else: # if target is far to the side
                 # defaults to driving foward, causing the car to circle until the target is within the front cone
                 velocity *= 1
+
+        # Line follower: never reverse, always drive forward
+        if self.line_follower and velocity < 0:
+            velocity = self.speed * 0.5
 
         """
         # optional derivative controller

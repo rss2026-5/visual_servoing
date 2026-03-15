@@ -55,7 +55,7 @@ class ConeDetector(Node):
         # Subscribe to ZED camera RGB frames
         self.cone_pub = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
         self.debug_pub = self.create_publisher(Image, "/cone_debug_img", 10)
-        self.image_sub = self.create_subscription(Image, "/zed/zed_node/rgb/image_rect_color", self.image_callback, 5)
+        self.image_sub = self.create_subscription(Image, "/zed/zed_node/rgb/image_rect_color", self.image_callback, 1)
         self.bridge = CvBridge()  # Converts between ROS images and OpenCV Images
 
         # Build the homography (image → ground) then invert it to find which
