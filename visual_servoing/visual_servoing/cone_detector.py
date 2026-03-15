@@ -50,7 +50,7 @@ class ConeDetector(Node):
     def __init__(self):
         super().__init__("cone_detector")
         # toggle line follower vs cone parker
-        self.LineFollower = False
+        self.LineFollower = True
 
         # Subscribe to ZED camera RGB frames
         self.cone_pub = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
@@ -88,9 +88,9 @@ class ConeDetector(Node):
         if cone_msg is not None:
             self.cone_pub.publish(cone_msg)
 
-            # Draw bounding box and center point on debug image
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.circle(image, (int(u), int(v)), 5, (0, 0, 255), -1)
+            # Draw debug visualization
+            u, v = int(cone_msg.u), int(cone_msg.v)
+            cv2.circle(image, (u, v), 5, (0, 0, 255), -1)
 
         debug_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
         self.debug_pub.publish(debug_msg)

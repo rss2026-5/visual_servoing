@@ -6,6 +6,7 @@ import numpy as np
 
 from vs_msgs.msg import ConeLocation, ParkingError
 from ackermann_msgs.msg import AckermannDriveStamped
+from sensor_msgs.msg import Joy
 
 
 class ParkingController(Node):
@@ -26,7 +27,10 @@ class ParkingController(Node):
 
         self.create_subscription(
             ConeLocation, "/relative_cone", self.relative_cone_callback, 1)
+        self.create_subscription(
+            Joy, "/vesc/joy", self.joy_callback, 1)
 
+        self.rb_held = False
         self.parking_distance = 0.75  # meters; try playing with this number!
         self.relative_x = 0
         self.relative_y = 0
@@ -38,6 +42,10 @@ class ParkingController(Node):
         self.previous_steering_angle = None
 
         self.get_logger().info("Parking Controller Initialized")
+
+    def joy_callback(self, msg):
+        # RB is typically button index 5
+        self.rb_held = msg.buttons[5] == 1 if len(msg.buttons) > 5 else False
 
     def relative_cone_callback(self, msg):
         self.relative_x = msg.x_pos
@@ -98,7 +106,8 @@ class ParkingController(Node):
         drive_cmd.drive.speed = velocity
         drive_cmd.drive.steering_angle = steering_angle
 
-        self.drive_pub.publish(drive_cmd)
+        if self.rb_held:
+            self.drive_pub.publish(drive_cmd)
         self.error_publisher()
 
     def error_publisher(self):
