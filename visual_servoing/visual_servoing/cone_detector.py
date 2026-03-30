@@ -49,8 +49,8 @@ class ConeDetector(Node):
 
     def __init__(self):
         super().__init__("cone_detector")
-        # toggle line follower vs cone parker
-        self.LineFollower = True
+        self.declare_parameter("line_follower", False)
+        self.LineFollower = self.get_parameter("line_follower").value
 
         # Subscribe to ZED camera RGB frames
         self.cone_pub = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
@@ -72,6 +72,7 @@ class ConeDetector(Node):
         img_pt /= img_pt[2]
         self.lookahead_row = int(img_pt[1, 0])
 
+        self.prev_u = None  # for temporal smoothing
         self.get_logger().info(
             f"Cone Detector Initialized | mode={'line_follower' if self.LineFollower else 'cone_parker'} "
             f"| lookahead_row={self.lookahead_row} ({LOOKAHEAD_DISTANCE} m)"
@@ -120,6 +121,11 @@ class ConeDetector(Node):
         mask = (cv2.inRange(img_hsv, LOWER_ORANGE_1, UPPER_ORANGE_1) |
                 cv2.inRange(img_hsv, LOWER_ORANGE_2, UPPER_ORANGE_2))
 
+        # Clean up noise
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.erode(mask, kernel, iterations=1)
+        mask = cv2.dilate(mask, kernel, iterations=1)
+
         img_h = image.shape[0]
         r0 = max(0, self.lookahead_row - LOOKAHEAD_BAND_PX // 2)
         r1 = min(img_h, self.lookahead_row + LOOKAHEAD_BAND_PX // 2)
@@ -148,6 +154,15 @@ class ConeDetector(Node):
         # Column centroid of that row for a stable lateral estimate
         same_row = (rows == best_row)
         u = float(np.mean(cols[same_row]))
+
+        # Temporal smoothing — reject huge jumps, blend with previous
+        MAX_JUMP_PX = 100
+        SMOOTH_ALPHA = 0.4  # weight of new reading (lower = smoother)
+        if self.prev_u is not None and abs(u - self.prev_u) > MAX_JUMP_PX:
+            u = self.prev_u  # reject outlier, keep previous
+        elif self.prev_u is not None:
+            u = SMOOTH_ALPHA * u + (1 - SMOOTH_ALPHA) * self.prev_u
+        self.prev_u = u
 
         msg = ConeLocationPixel()
         msg.u = u
